@@ -58,15 +58,46 @@ async function getDB() {
         console.error("Failed to copy seed DB:", err);
         // Fallback to empty
         dbInstance = new SQL.Database();
+        initTables(dbInstance); // Ensure tables exist
         saveDB();
     }
   } else {
     // No DB anywhere, create new
     dbInstance = new SQL.Database();
+    initTables(dbInstance); // Ensure tables exist
     saveDB(); // Initialize file
   }
 
   return dbInstance;
+}
+
+// Initialize tables if they don't exist
+function initTables(db) {
+    try {
+        db.run(`CREATE TABLE IF NOT EXISTS restaurants (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             name TEXT NOT NULL,
+             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+         )`);
+         
+        db.run(`CREATE TABLE IF NOT EXISTS sections (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             restaurant_id INTEGER NOT NULL,
+             name TEXT NOT NULL,
+             FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
+         )`);
+         
+        db.run(`CREATE TABLE IF NOT EXISTS meals (
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             section_id INTEGER NOT NULL,
+             name TEXT NOT NULL,
+             tried BOOLEAN DEFAULT 0,
+             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+             FOREIGN KEY (section_id) REFERENCES sections(id) ON DELETE CASCADE
+         )`);
+    } catch (err) {
+        console.error("Failed to init tables:", err);
+    }
 }
 
 function saveDB() {

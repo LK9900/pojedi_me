@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { fileURLToPath } from 'url';
+import { downloadDatabase, uploadDatabase } from './github-storage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,54 +19,52 @@ const dbPath = isVercel ? tmpDbPath : rootDbPath;
 
 let dbInstance = null;
 let SQL = null;
+let currentSha = null; // Track SHA for GitHub updates
 
 // Helper to ensure DB is loaded
 async function getDB() {
   if (dbInstance) return dbInstance;
 
   if (!SQL) {
-    // Locate the WASM file relative to this file (api/db.js)
     const wasmPath = path.join(__dirname, 'sql-wasm.wasm');
-    
     if (!fs.existsSync(wasmPath)) {
         throw new Error(`WASM file not found at ${wasmPath}`);
     }
-
     const wasmBinary = fs.readFileSync(wasmPath);
-
-    SQL = await initSqlJs({
-        wasmBinary
-    });
+    SQL = await initSqlJs({ wasmBinary });
   }
 
-  // Strategy:
-  // 1. If active dbPath exists, use it (it has latest data for this container).
-  // 2. If not, check if we have a seed database in project root (rootDbPath).
-  // 3. If yes, copy it to dbPath (so we start with seed data).
-  // 4. If no, create a new empty DB.
+  // Strategy for Persistence:
+  // 1. If we are on Vercel, try to download DB from GitHub first.
+  // 2. If download succeeds, write to dbPath and load.
+  // 3. If download fails (doesn't exist), check seed or create new.
+  
+  if (isVercel && !dbInstance) {
+      try {
+          console.log('Downloading DB from GitHub...');
+          const result = await downloadDatabase();
+          if (result) {
+              console.log('DB downloaded successfully.');
+              fs.writeFileSync(dbPath, result.buffer);
+              currentSha = result.sha;
+          } else {
+              console.log('No DB found on GitHub.');
+          }
+      } catch (err) {
+          console.error('Failed to download DB from GitHub:', err);
+      }
+  }
 
   if (fs.existsSync(dbPath)) {
     // Active DB exists
     const filebuffer = fs.readFileSync(dbPath);
     dbInstance = new SQL.Database(filebuffer);
-  } else if (isVercel && fs.existsSync(rootDbPath)) {
-    // First run in this container, copy from seed
-    try {
-        const seedBuffer = fs.readFileSync(rootDbPath);
-        fs.writeFileSync(dbPath, seedBuffer);
-        dbInstance = new SQL.Database(seedBuffer);
-    } catch (err) {
-        console.error("Failed to copy seed DB:", err);
-        // Fallback to empty
-        dbInstance = new SQL.Database();
-        initTables(dbInstance); // Ensure tables exist
-        saveDB();
-    }
   } else {
     // No DB anywhere, create new
     dbInstance = new SQL.Database();
-    initTables(dbInstance); // Ensure tables exist
-    saveDB(); // Initialize file
+    initTables(dbInstance);
+    // We don't save immediately here to avoid empty commit spam, 
+    // but the next write will trigger saveDB -> upload.
   }
 
   return dbInstance;
@@ -100,16 +99,32 @@ function initTables(db) {
     }
 }
 
-function saveDB() {
+async function saveDB() {
   if (dbInstance) {
     const data = dbInstance.export();
     const buffer = Buffer.from(data);
-    // This will write to /tmp/database.db on Vercel, which is allowed.
-    // Locally it writes to project root.
+    
+    // 1. Save locally to /tmp (fastest)
     try {
         fs.writeFileSync(dbPath, buffer);
     } catch (err) {
-        console.error("Failed to save DB:", err);
+        console.error("Failed to save DB locally:", err);
+    }
+
+    // 2. Upload to GitHub (Persistence)
+    // Only do this on Vercel to avoid dev spam, or if we want local dev to sync too.
+    // Let's do it always for now to ensure sync.
+    if (isVercel) {
+        console.log('Uploading DB to GitHub...');
+        try {
+            const newSha = await uploadDatabase(buffer, currentSha);
+            if (newSha) {
+                currentSha = newSha;
+                console.log('DB uploaded successfully. New SHA:', newSha);
+            }
+        } catch (err) {
+            console.error("Failed to upload DB to GitHub:", err);
+        }
     }
   }
 }
@@ -117,9 +132,6 @@ function saveDB() {
 // Wrapper methods
 const query = async (sql, params = []) => {
   const db = await getDB();
-  // sql.js .exec returns [{columns, values}]
-  // We want array of objects
-  // Use .prepare statement for safer binding and easier object mapping
   const stmt = db.prepare(sql);
   stmt.bind(params);
   
@@ -133,21 +145,14 @@ const query = async (sql, params = []) => {
 
 const run = async (sql, params = []) => {
   const db = await getDB();
-  // We need to execute and get lastID/changes.
-  // sql.js doesn't give easy access to changes/lastID in .run() return
-  // We have to execute, then check 'SELECT last_insert_rowid()' or 'SELECT changes()'
-  // BUT: .run() executes.
-  
   db.run(sql, params);
   
-  // Get metadata
-  // Note: sql.js doesn't strictly track 'changes' easily without another query, 
-  // but last_insert_rowid is standard.
   const idRes = db.exec("SELECT last_insert_rowid() as id")[0];
   const lastInsertRowid = idRes ? idRes.values[0][0] : 0;
   
   // Persist after write
-  saveDB();
+  // We await this to ensure it's saved before response returns (critical for serverless)
+  await saveDB();
   
   return { lastInsertRowid };
 };

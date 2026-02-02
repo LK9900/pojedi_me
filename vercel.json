@@ -1,0 +1,19 @@
+{
+  "rewrites": [
+    { "source": "/api/restaurants/:id/sections", "destination": "/api/sections?restaurantId=:id" },
+    { "source": "/api/restaurants/:id", "destination": "/api/restaurants?id=:id" },
+    { "source": "/api/restaurants", "destination": "/api/restaurants" },
+    { "source": "/api/sections/:sectionId/meals", "destination": "/api/meals?sectionId=:sectionId" },
+    { "source": "/api/sections/:id", "destination": "/api/sections?id=:id" },
+    { "source": "/api/sections", "destination": "/api/sections" },
+    { "source": "/api/meals/:id", "destination": "/api/meals?id=:id" },
+    { "source": "/api/meals", "destination": "/api/meals" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/*.js": {
+      "includeFiles": "api/sql-wasm.wasm",
+      "maxDuration": 10
+    }
+  }
+}

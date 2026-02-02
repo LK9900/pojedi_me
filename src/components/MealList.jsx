@@ -89,7 +89,7 @@ export default function MealList({ sectionId }) {
   const untried = meals.filter(m => !m.tried);
   const tried = meals.filter(m => m.tried);
 
-  if (!sectionId) return <p style={{color: '#666', textAlign: 'center', marginTop: '40px'}}>Select a section to view meals.</p>;
+  if (!sectionId) return <p class="empty-msg text-center mt-40">Select a section to view meals.</p>;
 
   return (
     <div class="meal-list-container">
@@ -106,10 +106,10 @@ export default function MealList({ sectionId }) {
           <MealItem key={m.id} meal={m} onToggle={handleToggle} onDelete={handleDelete} />
         ))}
         
-        {meals.length === 0 && <p style={{color: '#888', textAlign: 'center'}}>No meals yet in this section.</p>}
+        {meals.length === 0 && <p class="empty-msg text-center">No meals yet in this section.</p>}
       </div>
 
-      <form onSubmit={handleAdd} class="add-form" style={{marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '20px'}}>
+      <form onSubmit={handleAdd} class="add-form" style={{marginTop: '20px', borderTop: '1px solid #333', paddingTop: '20px'}}>
         <input 
           type="text" 
           placeholder="New Meal Name"

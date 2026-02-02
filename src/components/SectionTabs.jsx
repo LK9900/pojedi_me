@@ -78,8 +78,8 @@ export default function SectionTabs({ restaurantId, selectedSectionId, onSelectS
             {s.name}
             {selectedSectionId === s.id && (
               <span 
+                class="tab-delete-icon"
                 onClick={(e) => handleDelete(e, s.id)}
-                style={{ fontSize: '10px', marginLeft: '5px', cursor: 'pointer', opacity: 0.7 }}
                 title="Delete Section"
               >
                 ❌
@@ -87,7 +87,7 @@ export default function SectionTabs({ restaurantId, selectedSectionId, onSelectS
             )}
           </div>
         ))}
-        {sections.length === 0 && <span style={{padding: '8px', color: '#888'}}>No sections yet.</span>}
+        {sections.length === 0 && <span class="empty-msg">No sections yet.</span>}
       </div>
 
       <form onSubmit={handleAdd} class="add-form" style={{marginBottom: '20px'}}>

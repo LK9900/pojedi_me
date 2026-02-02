@@ -74,10 +74,9 @@ export default function RestaurantSelect({ selectedId, onSelect }) {
         {selectedId && (
           <button 
             type="button" 
-            class="btn btn-danger" 
+            class="btn btn-delete-rest" 
             onClick={handleDelete}
             title="Delete Restaurant"
-            style={{marginLeft: '10px', backgroundColor: '#ff4444'}}
           >
             🗑️
           </button>

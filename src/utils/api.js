@@ -1,7 +1,27 @@
+async function handleResponse(res, defaultMsg) {
+  if (!res.ok) {
+    let errorMsg = defaultMsg;
+    try {
+      const errorData = await res.json();
+      if (errorData.error) {
+        errorMsg += ': ' + errorData.error;
+      }
+    } catch {
+      try {
+        const text = await res.text();
+        if (text) errorMsg += ': ' + text.slice(0, 100); // Limit length
+      } catch (e) {
+        // ignore
+      }
+    }
+    throw new Error(errorMsg);
+  }
+  return res.json();
+}
+
 export async function fetchRestaurants() {
   const res = await fetch('/api/restaurants');
-  if (!res.ok) throw new Error('Failed to fetch restaurants');
-  return res.json();
+  return handleResponse(res, 'Failed to fetch restaurants');
 }
 
 export async function createRestaurant(name) {
@@ -10,20 +30,17 @@ export async function createRestaurant(name) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name })
   });
-  if (!res.ok) throw new Error('Failed to create restaurant');
-  return res.json();
+  return handleResponse(res, 'Failed to create restaurant');
 }
 
 export async function deleteRestaurant(id) {
   const res = await fetch(`/api/restaurants/${id}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error('Failed to delete restaurant');
-  return res.json();
+  return handleResponse(res, 'Failed to delete restaurant');
 }
 
 export async function fetchSections(restaurantId) {
   const res = await fetch(`/api/restaurants/${restaurantId}/sections`);
-  if (!res.ok) throw new Error('Failed to fetch sections');
-  return res.json();
+  return handleResponse(res, 'Failed to fetch sections');
 }
 
 export async function createSection(restaurantId, name) {
@@ -32,20 +49,17 @@ export async function createSection(restaurantId, name) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ restaurant_id: restaurantId, name })
   });
-  if (!res.ok) throw new Error('Failed to create section');
-  return res.json();
+  return handleResponse(res, 'Failed to create section');
 }
 
 export async function deleteSection(id) {
   const res = await fetch(`/api/sections/${id}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error('Failed to delete section');
-  return res.json();
+  return handleResponse(res, 'Failed to delete section');
 }
 
 export async function fetchMeals(sectionId) {
   const res = await fetch(`/api/sections/${sectionId}/meals`);
-  if (!res.ok) throw new Error('Failed to fetch meals');
-  return res.json();
+  return handleResponse(res, 'Failed to fetch meals');
 }
 
 export async function createMeal(sectionId, name) {
@@ -54,8 +68,7 @@ export async function createMeal(sectionId, name) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ section_id: sectionId, name })
   });
-  if (!res.ok) throw new Error('Failed to create meal');
-  return res.json();
+  return handleResponse(res, 'Failed to create meal');
 }
 
 export async function toggleMealTried(id, tried) {
@@ -64,12 +77,10 @@ export async function toggleMealTried(id, tried) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tried })
   });
-  if (!res.ok) throw new Error('Failed to update meal');
-  return res.json();
+  return handleResponse(res, 'Failed to update meal');
 }
 
 export async function deleteMeal(id) {
   const res = await fetch(`/api/meals/${id}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error('Failed to delete meal');
-  return res.json();
+  return handleResponse(res, 'Failed to delete meal');
 }
